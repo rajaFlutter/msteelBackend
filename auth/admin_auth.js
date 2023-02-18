@@ -16,6 +16,9 @@ const moment = require("moment");
 const cloudinary = require("cloudinary").v2;
 
 const cron = require("node-cron");
+const advertisementModel = require("../model/advertisement_model");
+
+
 
 
 
@@ -184,11 +187,10 @@ adminAuth.get("/admin/dashboardUserData/:adminId", async (req, res) => {
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status(400).json({ msg: "User not found!" });
         const allUsers = await userModel.find();
-        let userList = allUsers.slice(offset, offset + 20);
 
 
         const data = {
-            userList: userList,
+            userList: allUsers,
             totalUsers: allUsers.length,
             totalOrders: existingUser.orders.length,
             totalEnquiry: existingUser.enquiry.length
@@ -252,7 +254,7 @@ adminAuth.get("/admin/dashboardOrderData/:adminId", async (req, res) => {
 
 
         const data = {
-            orderList: orderList,
+            orderList: allOrders,
             totalUsers: allUsers.length,
             totalOrders: existingUser.orders.length,
             totalEnquiry: existingUser.enquiry.length
@@ -272,12 +274,11 @@ adminAuth.get("/admin/dashboardEnquiryData/:adminId", async (req, res) => {
         const adminId = req.params.adminId;
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status(400).json({ msg: "User not found!" });
-        const allUsers = await userModel.find();
-        const enquiryList = existingUser.enquiry.slice(offset, offset + 20);
+        const allEnquiry = await enquiryModel.find();
 
 
         const data = {
-            enquiryList: enquiryList,
+            enquiryList: allEnquiry,
             totalUsers: allUsers.length,
             totalOrders: existingUser.orders.length,
             totalEnquiry: existingUser.enquiry.length
@@ -528,7 +529,7 @@ adminAuth.post("/admin/addPayment/:adminId", async (req, res) => {
 
         await adminModel.findByIdAndUpdate(adminId, { $push: { payment: paymentData._id } });
 
-        await userModel.find({ fullName: fullName, number: number }, { $push: { transactions: paymentData._id, receipts: paymentData._id } });
+        await userModel.findOneAndUpdate({ fullName: fullName, number: number }, { $push: { transactions: paymentData._id, receipts: paymentData._id } });
 
         if (totalOutstandingPayment === totalPaidAmount) {
             orderData = await orderModel.findOne({ orderNumber: orderNumber });
@@ -739,7 +740,7 @@ adminAuth.get("/admin/getYearData/:adminId", async (req, res) => {
     }
 });
 
-// Advertisement api
+// Advertisement set api
 adminAuth.post("/admin/addAdvertisement/:adminId", upload.single("advertisementImage"), async (req, res) => {
     try {
         const { url } = req.body;
@@ -760,6 +761,19 @@ adminAuth.post("/admin/addAdvertisement/:adminId", upload.single("advertisementI
             });
         }).end(req.file.buffer);
 
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Advertisement get api
+adminAuth.get("/admin/getAdvertisement/:userId", async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const existingUser = await userModel.findById(userId);
+        if (!existingUser) return res.status(400).json({ msg: "User not found" });
+        const allAds = await advertisementModel.find();
+        res.json(allAds);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -57,12 +57,8 @@ let adminSchema = mongoose.Schema({
     ],
     advertisement: [
         {
-            image: {
-                type: schemaType.String,
-            },
-            url: {
-                type: schemaType.String,
-            }
+            type: schemaType.ObjectId,
+            ref: "advertisement"
         }
     ],
 });
