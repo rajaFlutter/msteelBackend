@@ -14,6 +14,7 @@ const paymentModel = require("../model/payment_model");
 const billModel = require("../model/bill_model");
 const moment = require("moment");
 const cloudinary = require("cloudinary").v2;
+const fs = require("fs");
 
 const cron = require("node-cron");
 const advertisementModel = require("../model/advertisement_model");
@@ -72,7 +73,14 @@ var authToken = process.env.AUTHTOKEN;
 var twilioNumber = process.env.TWILIONUMBER;
 const serviceSid = process.env.SERVICESID;
 
-const storage = multer.memoryStorage();
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, "uploads")
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + '-' + file.originalname)
+    }
+});
 
 const upload = multer({ storage: storage });
 
@@ -208,13 +216,14 @@ adminAuth.post("/admin/sendEnquiry/:adminId/:id", upload.single("enquiryImage"),
     try {
         const enquiryId = req.params.id;
         const adminId = req.params.adminId;
+        const imagePath = req.file.path;
 
 
         const { enquiryMsg, enquiryDate } = req.body;
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status(400).json({ msg: "User not found" });
 
-        cloudinary.uploader.upload_stream({ folder: `${adminId}/enquiryImages` }, (error, result) => {
+        cloudinary.uploader.upload(imagePath, (error, result) => {
             if (error) return res.status(400).json({ error: error.message });
 
             const adminEnquiryData = {
@@ -231,10 +240,15 @@ adminAuth.post("/admin/sendEnquiry/:adminId/:id", upload.single("enquiryImage"),
                     enquiryModel.find().exec((err, result) => {
                         if (err) return res.status(400).json({ msg: err.message });
                         res.json(result);
+                        fs.unlink(imagePath, (err) => {
+                            if (err) {
+                                console.log(err);
+                            }
+                        });
                     });
                 });
             });
-        }).end(req.file.buffer);
+        });
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -274,17 +288,18 @@ adminAuth.get("/admin/dashboardEnquiryData/:adminId", async (req, res) => {
         const adminId = req.params.adminId;
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status(400).json({ msg: "User not found!" });
-        const allEnquiry = await enquiryModel.find();
+        const allUsers = await userModel.find();
+        enquiryModel.find().populate("user.userId").exec((err, result) => {
+            if (err) return res.status(400).json({ msg: err.message });
+            const data = {
+                enquiryList: result,
+                totalUsers: allUsers.length,
+                totalOrders: existingUser.orders.length,
+                totalEnquiry: existingUser.enquiry.length
+            }
 
-
-        const data = {
-            enquiryList: allEnquiry,
-            totalUsers: allUsers.length,
-            totalOrders: existingUser.orders.length,
-            totalEnquiry: existingUser.enquiry.length
-        }
-
-        res.json(data);
+            res.json(data);
+        });
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -391,6 +406,40 @@ adminAuth.post("/admin/updateOrderStatus/:orderId/:adminId", async (req, res) =>
     }
 });
 
+// Get All Stock Data
+adminAuth.get("/admin/getAllStock/:adminId", async (req, res) => {
+    try {
+        const adminId = req.params.adminId;
+        const existingUser = await adminModel.findById(adminId);
+        if (!existingUser) return res.status(400).json({ msg: "User not found" });
+
+        stockModel.find().exec((err, result) => {
+            if (err) return res.status(400).json({ msg: err.message });
+            res.json(result);
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// get single stock data
+adminAuth.get("/admin/singleStockData/:stockId/:adminId", async (req, res) => {
+    try {
+        const stockId = req.params.stockId;
+        const adminId = req.params.adminId;
+        const existingUser = await adminModel.findById(adminId);
+        if (!existingUser) return res.status(400).json({ msg: "User not found" });
+        stockModel.findById(stockId).exec((err, result) => {
+            if (err) return res.status(400).json({ msg: err.message });
+            res.json(result);
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
+
 
 // Upload Stock data 
 adminAuth.post("/admin/uploadStock/:adminId", async (req, res) => {
@@ -399,7 +448,7 @@ adminAuth.post("/admin/uploadStock/:adminId", async (req, res) => {
         // we want fields in array [] and allData in object like {} => {thickness: "10mm", length: "20cm"} like this
 
         const adminId = req.params.adminId;
-        const { state, stockName, businessType, fields, allData, stockDate } = req.body;
+        const { state, stockName, businessType, fields, allData, stockDate, basic, loading, insurance, gst, tcs } = req.body;
 
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status(400).json({ msg: "No user found" });
@@ -409,6 +458,11 @@ adminAuth.post("/admin/uploadStock/:adminId", async (req, res) => {
             stockName: stockName,
             businessType: businessType,
             stockDate: stockDate,
+            basic: basic,
+            loading: loading,
+            insurance: insurance,
+            gst: gst,
+            tcs: tcs,
             fields: fields,
             allData: allData,
         });
@@ -745,23 +799,30 @@ adminAuth.post("/admin/addAdvertisement/:adminId", upload.single("advertisementI
     try {
         const { url } = req.body;
         const adminId = req.params.adminId;
+        const imagePath = req.file.path;
 
-
-
-        cloudinary.uploader.upload_stream({ folder: `${adminId}/advertisementImages` }, (err, result) => {
+        cloudinary.uploader.upload(imagePath, async (err, result) => {
             if (err) return res.status(400).json({ msg: err.message });
 
-            const advertisementData = {
+            let advertisementData = new advertisementModel({
                 image: result.url,
                 url: url
-            };
-            adminModel.findByIdAndUpdate(adminId, { $push: { advertisement: advertisementData } }, { new: true }, (err, result) => {
+            });
+            advertisementData = await advertisementData.save();
+            adminModel.findByIdAndUpdate(adminId, { $push: { advertisement: advertisementData._id } }, { new: true }).populate("advertisement").exec((err, result) => {
                 if (err) return res.status(400).json({ msg: err.message });
                 res.json(result);
+                fs.unlink(imagePath, (err) => {
+                    if (err) {
+                        console.log(err.message);
+                    }
+                });
+
             });
-        }).end(req.file.buffer);
+        });
 
     } catch (error) {
+
         res.status(500).json({ error: error.message });
     }
 });
@@ -784,15 +845,21 @@ adminAuth.post("/admin/editProfile/:adminId", upload.single("profilePic"), async
     try {
         const adminId = req.params.adminId;
         const { fullName, number } = req.body;
+        const imagePath = req.file.path;
 
-        cloudinary.uploader.upload_stream({ folder: `${adminId}/ProfilePic` }, (err, result) => {
+        cloudinary.uploader.upload(imagePath, (err, result) => {
             if (err) return res.status(400).json({ msg: err.message });
 
             adminModel.findByIdAndUpdate(adminId, { $set: { fullName: fullName, number: number, profilePic: result.url } }, { new: true }, (err, result) => {
                 if (err) return res.status(400).json({ msg: err.message });
                 res.json(result);
-            })
-        }).end(req.file.buffer);
+                fs.unlink(imagePath, (err) => {
+                    if (err) {
+                        console.log(err.message);
+                    }
+                });
+            });
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

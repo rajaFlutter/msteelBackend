@@ -14,6 +14,21 @@ let stockSchema = mongoose.Schema({
     stockDate: {
         type: schemaType.Date,
     },
+    basic: {
+        type: schemaType.String,
+    },
+    loading: {
+        type: schemaType.String,
+    },
+    insurance: {
+        type: schemaType.String,
+    },
+    gst: {
+        type: schemaType.String,
+    },
+    tcs: {
+        type: schemaType.String,
+    },
     fields: [
         {
             type: schemaType.String,

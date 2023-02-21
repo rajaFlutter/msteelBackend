@@ -10,6 +10,7 @@ const cloudinary = require("cloudinary").v2;
 const adminModel = require("../model/admin_model");
 const orderModel = require("../model/orders_model");
 const enquiryModel = require("../model/enquiry_model");
+const fs = require("fs");
 
 // Twilio credentials
 var accountSid = process.env.ACCOUNTSID;
@@ -20,7 +21,14 @@ const serviceSid = process.env.SERVICESID;
 
 const client = require('twilio')(accountSid, authToken);
 
-const storage = multer.memoryStorage();
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, "uploads")
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + '-' + file.originalname)
+    }
+});
 
 const upload = multer({ storage: storage });
 
@@ -111,6 +119,7 @@ userAuth.post("/user/resendOTP", async (req, res) => {
 userAuth.post("/user/login", async (req, res) => {
     try {
         const { number, password } = req.body;
+        console.log(number);
         const existingUser = await userModel.findOne({ number: number });
         if (!existingUser) return res.status(400).json({ msg: "User not found!" });
         const isMatch = await bcryptjs.compare(password, existingUser.password);
@@ -184,10 +193,11 @@ userAuth.post("/user/changePassword", async (req, res) => {
 //get all Enquiry api
 userAuth.get("/user/getAllEnquiry", auth, async (req, res) => {
     try {
-        const existingUser = await userModel.findById(req.user);
+        const existingUser = await userModel.findById(req.user).populate("enquiry");
         if (!existingUser) return res.status(400).json({ msg: "User not found!" });
         res.json({ ...existingUser._doc });
     } catch (error) {
+        console.log(error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -199,38 +209,46 @@ userAuth.post("/user/sendEnquiry", auth, upload.single("image"), async (req, res
     try {
         const { enquiryMsg, enquiryDate } = req.body;
 
-        let cloudResult = "";
+        const imagePath = req.file.path;
+        console.log(req.file);
+        console.log("files");
+        console.log(req.files);
         const existingUser = await userModel.findById(req.user);
         if (!existingUser) return res.status(400).json({ msg: "User not found" });
 
 
-        await cloudinary.uploader.upload_stream({ folder: `${req.user}/enquiryImage` }, (error, result) => {
+        cloudinary.uploader.upload(imagePath, async (error, result) => {
             if (error) return res.status(400).json({ msg: error.message });
 
-            cloudResult = result.url;
+            const userEnquiry = {
+                userId: req.user,
+                enquiry: enquiryMsg,
+                images: result.url,
+                enquiryDate: enquiryDate
+            }
 
-        }).end(req.file.buffer);
-
-        const userEnquiry = {
-            userId: req.user,
-            enquiry: enquiryMsg,
-            images: result.url,
-            enquiryDate: enquiryDate
-        }
-
-        let enquiry = new enquiryModel({
-            user: userEnquiry
-        });
-
-        enquiry = await enquiry.save();
-
-        userModel.findByIdAndUpdate(req.user, { $push: { enquiry: enquiry._id } }, { new: true }, (err, result) => {
-            if (err) return res.status.json({ msg: err.message });
-            enquiryModel.find().exec((err, result) => {
-                if (err) return res.status(400).json({ msg: err.message });
-                res.json(result);
+            let enquiry = new enquiryModel({
+                user: userEnquiry
             });
+
+            enquiry = await enquiry.save();
+
+            userModel.findByIdAndUpdate(req.user, { $push: { enquiry: enquiry._id } }, { new: true }, (err, result) => {
+                if (err) return res.status.json({ msg: err.message });
+                userModel.findById(req.user).populate("enquiry").exec((err, result) => {
+                    if (err) return res.status(400).json({ msg: err.message });
+                    res.json(result);
+                    fs.unlink(imagePath, (err) => {
+                        if (err) {
+                            console.log(err);
+                        }
+                    })
+                });
+            });
+
         });
+
+
 
 
     } catch (error) {
