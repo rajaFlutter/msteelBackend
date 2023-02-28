@@ -2,43 +2,29 @@ const mongoose = require("mongoose");
 const schemaType = mongoose.Schema.Types;
 
 let stockSchema = mongoose.Schema({
+    stockName: {
+        type: schemaType.String,
+    },
     stateName: {
         type: schemaType.String,
     },
-    stockName: {
+    stockDate: {
         type: schemaType.String,
     },
     businessType: {
         type: schemaType.String,
     },
-    stockDate: {
-        type: schemaType.Date,
+    stockPrice: {
+        type: schemaType.Number,
+        default: 0,
     },
-    basic: {
-        type: schemaType.String,
-    },
-    loading: {
-        type: schemaType.String,
-    },
-    insurance: {
-        type: schemaType.String,
-    },
-    gst: {
-        type: schemaType.String,
-    },
-    tcs: {
-        type: schemaType.String,
-    },
-    fields: [
+    stockData: [
         {
-            type: schemaType.String,
-        }
-    ],
-    allData: [
-        {
-            type: schemaType.Mixed,
+            type: schemaType.ObjectId,
+            ref: "stockData"
         }
     ]
+
 });
 
 const stockModel = mongoose.model("stock", stockSchema);

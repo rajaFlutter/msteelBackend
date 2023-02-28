@@ -22,8 +22,15 @@ const orderSchema = mongoose.Schema({
     plantLoc: {
         type: schemaType.String,
     },
-    productName: {
-        type: schemaType.String,
+    product: {
+        stock: {
+            type: schemaType.ObjectId,
+            ref: "stock"
+        },
+        stockData: {
+            type: schemaType.ObjectId,
+            ref: "stockData"
+        }
     },
     netPrice: {
         type: schemaType.Number,
@@ -34,8 +41,12 @@ const orderSchema = mongoose.Schema({
     orderAmount: {
         type: schemaType.Number,
     },
+    amountLeft: {
+        typ: schemaType.Number,
+    },
     status: {
-        type: schemaType.Boolean,
+        type: schemaType.String,
+        default: "pending",
     },
     orderNumber: {
         type: schemaType.Number,

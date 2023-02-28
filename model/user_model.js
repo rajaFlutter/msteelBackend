@@ -8,6 +8,10 @@ let userSchema = mongoose.Schema({
         required: true,
         trim: true,
     },
+    profilePic: {
+        type: schemaType.String,
+        default: ""
+    },
     number: {
         type: schemaType.String,
         required: true,
@@ -27,6 +31,10 @@ let userSchema = mongoose.Schema({
     password: {
         type: schemaType.String,
         required: true,
+    },
+    address: {
+        type: schemaType.String,
+        default: ""
     },
     zipCode: {
         type: schemaType.String,
@@ -50,6 +58,14 @@ let userSchema = mongoose.Schema({
     },
     otp: {
         type: schemaType.Number,
+    },
+    balanceAmount: {
+        type: schemaType.String,
+        default: "0.00"
+    },
+    subscribed: {
+        type: schemaType.Boolean,
+        default: false,
     },
     enquiry: [
         {
@@ -80,7 +96,9 @@ let userSchema = mongoose.Schema({
             type: schemaType.ObjectId,
             ref: "bill",
         }
-    ]
+    ],
+
+
 
 });
 
