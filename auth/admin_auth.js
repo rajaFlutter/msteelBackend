@@ -18,7 +18,7 @@ const fs = require("fs");
 
 const cron = require("node-cron");
 const advertisementModel = require("../model/advertisement_model");
-const stockDataModel = require("../model/stockData_model");
+const { restart } = require("nodemon");
 
 
 
@@ -344,6 +344,22 @@ adminAuth.get("/admin/userManagement/:adminId", async (req, res) => {
     }
 });
 
+// Get Single User
+adminAuth.get("/admin/getSingleUser/:userId/:adminId", async (req, res) => {
+    try {
+        const adminId = req.params.adminId;
+        const userId = req.params.userId;
+        const existingUser = await adminModel.findById(adminId);
+        if (!existingUser) return res.status(400).json({ msg: "User not found" });
+        userModel.findById(userId).exec((err, result) => {
+            if (err) return res.status(400).json({ error: err.message });
+            res.json(result);
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 // Edit User details - User Management
 adminAuth.post("/admin/editUser/:adminId", async (req, res) => {
@@ -445,23 +461,47 @@ adminAuth.get("/admin/getAllStock/:adminId", async (req, res) => {
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status(400).json({ msg: "User not found" });
 
-        adminModel.findById(adminId).populate({
-            path: "stock",
-            populate: {
-                path: "stockData"
-            }
-        }).exec((err, result) => {
-            if (err) return req.status(400).json({ error: err.message });
+
+        stockModel.find().exec((err, result) => {
+            if (err) return res.status(400).json({ error: err.message });
             res.json(result);
-        })
-        // stockModel.find().exec((err, result) => {
-        //     if (err) return res.status(400).json({ msg: err.message });
-        //     res.json(result);
-        // });
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
+
+// Get All B2B stock Data
+adminAuth.get("/admin/getB2BStock/:adminId", async (req, res) => {
+    try {
+        const adminId = req.params.adminId;
+        const existingUser = await adminModel.findById(adminId);
+        if (!existingUser) return res.status(400).json({ msg: "User not found" });
+        stockModel.find({ businessType: "B2B" }).exec((err, result) => {
+            if (err) return res.status(400).json({ error: err.message });
+
+            res.json(result);
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+})
+
+// Get All B2C stock Data
+adminAuth.get("/admin/getB2CStock/:adminId", async (req, res) => {
+    try {
+        const adminId = req.params.adminId;
+        const existingUser = await adminModel.findById(adminId);
+        if (!existingUser) return res.status(400).json({ msg: "User not found" });
+        stockModel.find({ businessType: "B2C" }).exec((err, result) => {
+            if (err) return res.status(400).json({ error: err.message });
+
+            res.json(result);
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+})
 
 // get single stock data
 adminAuth.get("/admin/singleStockData/:stockId/:adminId", async (req, res) => {
@@ -470,7 +510,7 @@ adminAuth.get("/admin/singleStockData/:stockId/:adminId", async (req, res) => {
         const adminId = req.params.adminId;
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status(400).json({ msg: "User not found" });
-        stockModel.findById(stockId).populate("stockData").exec((err, result) => {
+        stockModel.findById(stockId).exec((err, result) => {
             if (err) return res.status(400).json({ msg: err.message });
             res.json(result);
         });
@@ -489,78 +529,64 @@ adminAuth.post("/admin/uploadStock/:adminId", async (req, res) => {
         // we want fields in array [] and allData in object like {} => {thickness: "10mm", length: "20cm"} like this
 
         const adminId = req.params.adminId;
-        const { state, stockName, businessType, fields, thickness, allData, stockDate, basic, loading, insurance, gst, tcs } = req.body;
+        const { state, stockName, businessType, stockDate, stockData } = req.body;
+        const ss = stockData;
 
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status(400).json({ msg: "No user found" });
 
+        let sStock = new stockModel({
+            stockName: stockName,
+            stateName: state,
+            stockDate: stockDate,
+            businessType: businessType,
+            stockPrice: parseInt(ss.basic) + parseInt(ss.loading) + parseInt(ss.insurance) + parseInt(ss.gst) + parseInt(ss.tcs),
+            stockData: stockData
 
 
-        let stockData = new stockDataModel({
-            basic: basic,
-            loading: loading,
-            insurance: insurance,
-            gst: gst,
-            tcs: tcs,
-            thickness: thickness,
-            fields: fields,
-            allData: allData,
         });
 
-        stockData = await stockData.save();
+        sStock = await sStock.save();
 
-        const stockExist = await stockModel.findOne({ stockName: stockName, stateName: state });
+        // let updatedPrice = 0;
 
-        let updatedPrice = 0;
-        if (stockExist) {
+        // const currentPrice = parseInt(basic) + parseInt(loading) + parseInt(insurance) + parseInt(gst) + parseInt(tcs);
 
-            const currentPrice = parseInt(basic) + parseInt(loading) + parseInt(insurance) + parseInt(gst) + parseInt(tcs);
+        // if (parseInt(sStock.stockPrice) > currentPrice) {
+        //     updatedPrice = currentPrice;
+        // }
+        // else {
+        //     updatedPrice = parseInt(sStock.stockPrice);
+        // }
 
-            if (parseInt(stockExist.stockPrice) > currentPrice) {
-                updatedPrice = currentPrice;
-            }
-            else {
-                updatedPrice = parseInt(stockExist.stockPrice);
-            }
+        stockModel.find().exec((err, result) => {
+            if (err) return res.status(400).json({ error: err.message });
 
+            res.json(result);
+        })
 
-            stockModel.findByIdAndUpdate(stockExist._id, { $set: { stockPrice: updatedPrice }, $push: { stockData: stockData._id } }, { new: true }, (err, result) => {
-                if (err) return res.status(400).json({ error: err.message });
+        // }
+        // else {
 
+        //     const currentPrice = parseInt(basic) + parseInt(loading) + parseInt(insurance) + parseInt(gst) + parseInt(tcs);
 
-
-                stockModel.find().populate("stockData").exec((err, result) => {
-                    if (err) return res.status(400).json({ error: err.message });
-                    res.json(result);
-                });
-            })
-        }
-        else {
-
-            const currentPrice = parseInt(basic) + parseInt(loading) + parseInt(insurance) + parseInt(gst) + parseInt(tcs);
-
-            let stock = new stockModel({
-                stockName: stockName,
-                stateName: state,
-                stockDate: stockDate,
-                businessType: businessType,
-                stockPrice: currentPrice,
-                stockData: stockData._id
-            });
-            stock = await stock.save();
-            adminModel.findByIdAndUpdate(adminId, { $push: { stock: stock._id } }, { new: true }, (err, result) => {
-                if (err) return res.status(400).json({ error: err.message });
-                adminModel.findById(adminId).populate({
-                    path: "stock",
-                    populate: {
-                        path: "stockData"
-                    }
-                }).exec((err, result) => {
-                    if (err) return res.status(400).json({ error: err.message });
-                    res.json(result);
-                });
-            });
-        }
+        //     let stock = new stockModel({
+        //         stockName: stockName,
+        //         stateName: state,
+        //         stockDate: stockDate,
+        //         businessType: businessType,
+        //         stockPrice: currentPrice,
+        //         stockData: stockData._id
+        //     });
+        //     stock = await stock.save();
+        //     adminModel.findByIdAndUpdate(adminId, { $push: { stock: stock._id } }, { new: true }, (err, result) => {
+        //         if (err) return res.status(400).json({ error: err.message });
+        //         adminModel.findById(adminId).populate("stock").exec((err, result) => {
+        //             if (err) return res.status(400).json({ error: err.message });
+        //             res.json(result);
+        //         });
+        //     });
+        // }
 
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -568,26 +594,21 @@ adminAuth.post("/admin/uploadStock/:adminId", async (req, res) => {
 });
 
 // Edit stock 
-adminAuth.post("/admin/editStock/:stockId/:stockDataId/:adminId", async (req, res) => {
+adminAuth.post("/admin/editStock/:stockId/:adminId", async (req, res) => {
     try {
 
         // we want fields in array [] and allData in object like {} => {thickness: "10mm", length: "20cm"} like this
         const adminId = req.params.adminId;
         const stockId = req.params.stockId;
-        const stockDataId = req.params.stockDataId;
         const { state, stockName, businessType, basic, loading, insurance, gst, tcs, thickness, stockDate, fields, allData } = req.body;
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status(400).json({ msg: err.message });
 
-        stockModel.findByIdAndUpdate(stockId, { $set: { stateName: state, stockName: stockName, businessType: businessType, stockDate: stockDate } }, { new: true }, (err, result) => {
+        stockModel.findByIdAndUpdate(stockId, { $set: { stateName: state, stockName: stockName, businessType: businessType, stockDate: stockDate, basic: basic, loading: loading, insurance: insurance, gst: gst, tcs: tcs, thickness: thickness, fields: fields, allData } }, { new: true }, (err, result) => {
             if (err) return res.status(400).json({ msg: err.message });
-
-            stockDataModel.findByIdAndUpdate(stockDataId, { $set: { basic: basic, loading: loading, insurance: insurance, gst: gst, tcs: tcs, thickness: thickness, fields: fields, allData: allData } }, { new: true }, (err, result) => {
+            stockModel.find().exec((err, result) => {
                 if (err) return res.status(400).json({ error: err.message });
-                stockModel.find().populate("stockData").exec((err, result) => {
-                    if (err) return res.status(400).json({ error: err.message });
-                    res.json(result);
-                });
+                res.json(result);
             });
             // res.json(result);
         });
@@ -604,21 +625,13 @@ adminAuth.post("/admin/deleteStock/:stockId/:adminId", async (req, res) => {
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status(400).json({ msg: "User not found!" });
 
-        stockModel.findById(stockId).exec((err, result) => {
+        stockModel.findByIdAndDelete(stockId, (err, result) => {
             if (err) return res.status(400).json({ error: err.message });
-            for (let index = 0; index < result.stockData.length; index++) {
-                const element = result.stockData[index];
-                stockDataModel.findByIdAndDelete(element, (err, result) => {
-                    if (err) return res.status(400).json({ error: err.message });
-                    stockModel.find().populate("stockData").exec((err, result) => {
-                        if (err) return res.status(400).json({ error: err.message });
-                        res.json(result);
-                    })
-                });
-
-            }
-        });
-
+            stockModel.find().exec((err, result) => {
+                if (err) return res.status(400).json({ error: err.message });
+                res.json(result);
+            })
+        })
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -626,28 +639,28 @@ adminAuth.post("/admin/deleteStock/:stockId/:adminId", async (req, res) => {
 
 
 // Delete Stock data
-adminAuth.post("/admin/deleteStock/:stockId/:stockDataId/:adminId", async (req, res) => {
-    try {
-        const stockId = req.params.stockId;
-        const adminId = req.params.adminId;
-        const stockDataId = req.params.stockDataId;
-        const existingUser = await adminModel.findById(adminId);
-        if (!existingUser) return res.status(400).json({ msg: "User not found!" });
+// adminAuth.post("/admin/deleteStock/:stockId/:stockDataId/:adminId", async (req, res) => {
+//     try {
+//         const stockId = req.params.stockId;
+//         const adminId = req.params.adminId;
+//         const stockDataId = req.params.stockDataId;
+//         const existingUser = await adminModel.findById(adminId);
+//         if (!existingUser) return res.status(400).json({ msg: "User not found!" });
 
-        stockModel.findByIdAndUpdate(stockId, { $pull: { stockData: stockDataId } }, { new: true }, (err, result) => {
-            if (err) return res.status(400).json({ error: err.message });
-            stockDataModel.findByIdAndDelete(stockDataId, (err, result) => {
-                if (err) return res.status(400).json({ error: err.message });
-                stockModel.find().populate("stockData").exec((err, result) => {
-                    if (err) return res.status(400).json({ error: err.message });
-                    res.json(result);
-                });
-            });
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+//         stockModel.findByIdAndUpdate(stockId, { $pull: { stockData: stockDataId } }, { new: true }, (err, result) => {
+//             if (err) return res.status(400).json({ error: err.message });
+//             stockDataModel.findByIdAndDelete(stockDataId, (err, result) => {
+//                 if (err) return res.status(400).json({ error: err.message });
+//                 stockModel.find().exec((err, result) => {
+//                     if (err) return res.status(400).json({ error: err.message });
+//                     res.json(result);
+//                 });
+//             });
+//         });
+//     } catch (error) {
+//         res.status(500).json({ error: error.message });
+//     }
+// });
 
 
 // Get all Orders
@@ -656,7 +669,7 @@ adminAuth.get("/admin/getAllOrders/:adminId", async (req, res) => {
         const adminId = req.params.adminId;
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status(400).json({ msg: "User not found" });
-        allOrders = await orderModel.find().populate(['product.stock', 'product.stockData']);
+        allOrders = await orderModel.find().populate("product");
 
         // let orderList = allOrders.slice(offset, offset + 20);
 

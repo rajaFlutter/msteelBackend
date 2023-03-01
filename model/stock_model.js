@@ -18,12 +18,35 @@ let stockSchema = mongoose.Schema({
         type: schemaType.Number,
         default: 0,
     },
-    stockData: [
+    stockData: {
+
+        basic: {
+            type: schemaType.String,
+        },
+        loading: {
+            type: schemaType.String,
+        },
+        insurance: {
+            type: schemaType.String,
+        },
+        gst: {
+            type: schemaType.String,
+        },
+        tcs: {
+            type: schemaType.String,
+        },
+        thickness: {
+            type: schemaType.String,
+        },
+        fields: {
+            type: schemaType.Array,
+        },
+        allData:
         {
-            type: schemaType.ObjectId,
-            ref: "stockData"
+            type: schemaType.Mixed,
         }
-    ]
+
+    }
 
 });
 

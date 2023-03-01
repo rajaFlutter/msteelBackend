@@ -23,14 +23,8 @@ const orderSchema = mongoose.Schema({
         type: schemaType.String,
     },
     product: {
-        stock: {
-            type: schemaType.ObjectId,
-            ref: "stock"
-        },
-        stockData: {
-            type: schemaType.ObjectId,
-            ref: "stockData"
-        }
+        type: schemaType.ObjectId,
+        ref: "stock"
     },
     netPrice: {
         type: schemaType.Number,
