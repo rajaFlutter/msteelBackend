@@ -841,10 +841,6 @@ adminAuth.post("/admin/editPayment/:paymentId/:adminId", async (req, res) => {
             const currentLeftAmount = Number(previousRemainingAmount) - Number(amountLeft);
             const totalUserAmount = Number(userData.balanceAmount) - Number(currentLeftAmount);
 
-
-            // const userData = await userModel.findOne({ number: number });
-            // const amountLeft = totalOutstandingPayment - totalPaidAmount;
-
             await userModel.findOneAndUpdate({ fullName: fullName, number: number }, { $push: { bills: billData._id }, $set: { balanceAmount: totalUserAmount } });
             // await userModel.findOneAndUpdate({ fullName: fullName, number: number }, { $push: { bills: billData._id }, $set: { balanceAmount: totalUserAmount } });
 
