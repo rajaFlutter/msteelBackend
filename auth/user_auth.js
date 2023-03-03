@@ -64,7 +64,7 @@ userAuth.post("/user/signup", async (req, res) => {
             password: hashedPassword,
             zipCode: zipCode.trim(),
             city: city.trim(),
-            otp: randomNumber,
+            otp: 0000,
             state: state.trim(),
             businessType: businessType.trim()
         });
@@ -84,15 +84,15 @@ userAuth.post("/user/signup", async (req, res) => {
         res.json({ ...user._doc, token: token });
 
         // otp sending 
-        client.messages.create({
-            body: `Your OTP is ${randomNumber}`,
-            messagingServiceSid: serviceSid,
-            to: number,
-        }).then(message => {
-            console.log(message.sid);
-            console.log(message);
+        // client.messages.create({
+        //     body: `Your OTP is ${randomNumber}`,
+        //     messagingServiceSid: serviceSid,
+        //     to: number,
+        // }).then(message => {
+        //     console.log(message.sid);
+        //     console.log(message);
 
-        }).done();
+        // }).done();
 
     } catch (error) {
         console.log(error);
@@ -108,16 +108,16 @@ userAuth.post("/user/resendOTP", async (req, res) => {
         if (!existingUser) return res.status(403).json({ msg: "User not found" });
         let randomNumber = Math.floor(1000 + Math.random() * 9000);
 
-        await userModel.findOneAndUpdate({ number: number }, { $set: { otp: randomNumber } });
+        await userModel.findOneAndUpdate({ number: number }, { $set: { otp: 0000 } });
         res.json({ ...existingUser._doc });
-        client.messages.create({
-            body: `Your OTP is ${randomNumber}`,
-            messagingServiceSid: serviceSid,
-            to: "+919024350276"
-        }).then(message => {
-            console.log(message.sid);
-            console.log(message);
-        }).done();
+        // client.messages.create({
+        //     body: `Your OTP is ${randomNumber}`,
+        //     messagingServiceSid: serviceSid,
+        //     to: "+919024350276"
+        // }).then(message => {
+        //     console.log(message.sid);
+        //     console.log(message);
+        // }).done();
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -169,17 +169,18 @@ userAuth.post("/user/loginWithOtp", async (req, res) => {
         const existingUser = await userModel.findOne({ number: number });
         if (!existingUser) return res.status(403).json({ msg: "User not found" });
         let randomNumber = Math.floor(1000 + Math.random() * 9000);
+        await userModel.findByIdAndUpdate(existingUser._id, { $set: { otp: 0000 } });
 
         res.json({ msg: "OTP send" });
 
-        client.messages.create({
-            body: `Your OTP is ${randomNumber}`,
-            messagingServiceSid: serviceSid,
-            to: number
-        }).then(message => {
-            console.log(message.sid);
+        // client.messages.create({
+        //     body: `Your OTP is ${randomNumber}`,
+        //     messagingServiceSid: serviceSid,
+        //     to: number
+        // }).then(message => {
+        //     console.log(message.sid);
 
-        }).done();
+        // }).done();
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -235,16 +236,20 @@ userAuth.post("/user/forgotpassword", async (req, res) => {
         if (!existingUser) return res.status(403).json({ msg: "User not found" });
         let randomNumber = Math.floor(1000 + Math.random() * 9000);
 
-        client.messages.create({
-            body: `Your OTP is ${randomNumber}`,
-            messagingServiceSid: serviceSid,
-            to: number
-        }).then(message => {
-            console.log(message.sid);
-            userModel.findByIdAndUpdate(existingUser._id, { $set: { otp: randomNumber } }, { new: true }, (err, result) => {
-                res.json({ ...result._doc });
-            })
-        }).done();
+        userModel.findByIdAndUpdate(existingUser._id, { $set: { otp: 0000 } }, { new: true }, (err, result) => {
+            res.json({ ...result._doc });
+        })
+
+        // client.messages.create({
+        //     body: `Your OTP is ${randomNumber}`,
+        //     messagingServiceSid: serviceSid,
+        //     to: number
+        // }).then(message => {
+        //     console.log(message.sid);
+        //     // userModel.findByIdAndUpdate(existingUser._id, { $set: { otp: randomNumber } }, { new: true }, (err, result) => {
+        //     //     res.json({ ...result._doc });
+        //     // })
+        // }).done();
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
