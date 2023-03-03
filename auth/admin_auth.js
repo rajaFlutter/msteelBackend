@@ -801,7 +801,7 @@ adminAuth.post("/admin/editPayment/:paymentId/:adminId", async (req, res) => {
         if (!existingUser) return res.status(400).json({ msg: "User not found" });
 
 
-        // const paymentData = await paymentModel.findById(paymentId);
+        const paymentData = await paymentModel.findById(paymentId);
         await paymentModel.findByIdAndUpdate(paymentId, {
             $set: {
                 paymentDate: paymentDate,
@@ -832,12 +832,20 @@ adminAuth.post("/admin/editPayment/:paymentId/:adminId", async (req, res) => {
             billData = await billData.save();
 
 
-            // const previousRemainingAmount = paymentData.totalOutstandingPayment - paymentData.totalPaidAmount;
+            const userData = await userModel.findOne({ number: number });
+            const amountLeft = Number(totalOutstandingPayment) - Number(totalPaidAmount);
+
+            const previousRemainingAmount = Number(paymentData.totalOutstandingPayment) - Number(paymentData.totalPaidAmount);
+
+            // subtract this amount with user remaining balance
+            const currentLeftAmount = Number(previousRemainingAmount) - Number(amountLeft);
+            const totalUserAmount = Number(userData.balanceAmount) - Number(currentLeftAmount);
+
+
             // const userData = await userModel.findOne({ number: number });
             // const amountLeft = totalOutstandingPayment - totalPaidAmount;
-            // const totalUserAmount = userData.balanceAmount - previousRemainingAmount;
 
-            await userModel.findOneAndUpdate({ fullName: fullName, number: number }, { $push: { bills: billData._id } });
+            await userModel.findOneAndUpdate({ fullName: fullName, number: number }, { $push: { bills: billData._id }, $set: { balanceAmount: totalUserAmount } });
             // await userModel.findOneAndUpdate({ fullName: fullName, number: number }, { $push: { bills: billData._id }, $set: { balanceAmount: totalUserAmount } });
 
             await orderModel.findByIdAndUpdate(orderData._id, { $set: { status: "completed" } });
@@ -850,11 +858,17 @@ adminAuth.post("/admin/editPayment/:paymentId/:adminId", async (req, res) => {
         }
         else {
 
-            // const userData = await userModel.findOne({ number: number });
-            // const amountLeft = totalOutstandingPayment - totalPaidAmount;
-            // const totalUserAmount = userData.balanceAmount + amountLeft;
+            const userData = await userModel.findOne({ number: number });
+            const amountLeft = Number(totalOutstandingPayment) - Number(totalPaidAmount);
 
-            // await userModel.findByIdAndUpdate(userData._id, { $set: { balanceAmount: totalUserAmount } });
+            const previousRemainingAmount = Number(paymentData.totalOutstandingPayment) - Number(paymentData.totalPaidAmount);
+
+            // subtract this amount with user remaining balance
+            const currentLeftAmount = Number(previousRemainingAmount) - Number(amountLeft);
+
+            const totalUserAmount = Number(userData.balanceAmount) - Number(currentLeftAmount);
+
+            await userModel.findOneAndUpdate({ fullName: fullName, number: number }, { $push: { bills: billData._id }, $set: { balanceAmount: totalUserAmount } });
 
             await orderModel.findOneAndUpdate({ orderNumber: orderNumber }, { $set: { status: "incompleted" } });
 
