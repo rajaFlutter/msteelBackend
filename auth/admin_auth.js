@@ -742,6 +742,7 @@ adminAuth.post("/admin/addPayment/:adminId", async (req, res) => {
         await userModel.findOneAndUpdate({ fullName: fullName, number: number }, { $push: { transactions: paymentData._id, receipts: paymentData._id } });
 
         if (totalOutstandingPayment === totalPaidAmount) {
+            console.log("inside if");
             orderData = await orderModel.findOne({ orderNumber: orderNumber });
 
             let billData = new billModel({
@@ -766,15 +767,16 @@ adminAuth.post("/admin/addPayment/:adminId", async (req, res) => {
 
         }
         else {
+            console.log("inside else");
+            const userData = await userModel.findOne({ number: number });
+            const amountLeft = Number(totalOutstandingPayment) - Number(totalPaidAmount);
+            const totalUserAmount = Number(userData.balanceAmount) + Number(amountLeft);
+            console.log(totalUserAmount);
 
-            // const userData = await userModel.findOne({ number: number });
-            // const amountLeft = totalOutstandingPayment - totalPaidAmount;
-            // const totalUserAmount = userData.balanceAmount + amountLeft;
-
-            // await userModel.findByIdAndUpdate(userData._id, { $set: { balanceAmount: totalUserAmount } });
+            await userModel.findByIdAndUpdate(userData._id, { $set: { balanceAmount: totalUserAmount.toString() } });
 
 
-            await orderModel.findOneAndUpdate({ orderNumber: orderNumber }, { $set: { status: "incompleted" } });
+            await orderModel.findOneAndUpdate({ orderNumber: orderNumber }, { $set: { status: "completed" } });
 
             adminModel.findById(adminId).populate("payment").exec((err, result) => {
                 if (err) return res.status(400).json({ msg: err.message });

@@ -57,19 +57,21 @@ userAuth.post("/user/signup", async (req, res) => {
 
 
         let user = new userModel({
-            fullName,
-            number,
-            email,
+            fullName: fullName.trim(),
+            number: number.trim(),
+            email: email.trim(),
             password: hashedPassword,
-            zipCode,
-            city,
+            zipCode: zipCode.trim(),
+            city: city.trim(),
             otp: randomNumber,
-            state,
-            businessType
+            state: state.trim(),
+            businessType: businessType.trim()
         });
 
         user = await user.save();
         const token = jwt.sign({ id: user._id }, jwtKey);
+
+        await stockModel.find()
 
         res.json({ ...user._doc, token: token });
 
@@ -77,13 +79,15 @@ userAuth.post("/user/signup", async (req, res) => {
         client.messages.create({
             body: `Your OTP is ${randomNumber}`,
             messagingServiceSid: serviceSid,
-            to: "+919549196262"
+            to: number,
         }).then(message => {
             console.log(message.sid);
+            console.log(message);
 
         }).done();
 
     } catch (error) {
+        console.log(error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -93,7 +97,7 @@ userAuth.post("/user/resendOTP", async (req, res) => {
     try {
         const { number } = req.body;
         const existingUser = await userModel.find({ number: number });
-        if (!existingUser) return res.status(400).json({ msg: "User not found" });
+        if (!existingUser) return res.status(403).json({ msg: "User not found" });
         let randomNumber = Math.floor(1000 + Math.random() * 9000);
 
         await userModel.findOneAndUpdate({ number: number }, { $set: { otp: randomNumber } });
@@ -104,6 +108,7 @@ userAuth.post("/user/resendOTP", async (req, res) => {
             to: "+919024350276"
         }).then(message => {
             console.log(message.sid);
+            console.log(message);
         }).done();
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -115,7 +120,7 @@ userAuth.post("/user/login", async (req, res) => {
     try {
         const { number, password } = req.body;
         const existingUser = await userModel.findOne({ number: number });
-        if (!existingUser) return res.status(400).json({ msg: "User not found!" });
+        if (!existingUser) return res.status(403).json({ msg: "User not found!" });
         const isMatch = await bcryptjs.compare(password, existingUser.password);
         if (!isMatch) return res.status(400).json({ msg: "Incorrect Password" });
 
@@ -148,14 +153,61 @@ userAuth.post("/user/login", async (req, res) => {
     }
 });
 
+// Login with OTP api
+userAuth.post("/user/loginWithOtp", async (req, res) => {
+    try {
+        const { number } = req.body;
+        console.log(number);
+        const existingUser = await userModel.findOne({ number: number });
+        if (!existingUser) return res.status(403).json({ msg: "User not found" });
+        let randomNumber = Math.floor(1000 + Math.random() * 9000);
+
+        res.json({ msg: "OTP send" });
+
+        client.messages.create({
+            body: `Your OTP is ${randomNumber}`,
+            messagingServiceSid: serviceSid,
+            to: number
+        }).then(message => {
+            console.log(message.sid);
+
+        }).done();
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // otp verification
 userAuth.post("/user/otpVerification", async (req, res) => {
     try {
         const { otp, number } = req.body;
         const existingUser = await userModel.findOne({ number: number });
-        if (!existingUser) return res.status(400).json({ msg: "User not found" });
+        if (!existingUser) return res.status(403).json({ msg: "User not found" });
+
+
         if (parseInt(otp) === existingUser.otp) {
-            res.json({ ...existingUser._doc });
+            if (existingUser.businessType === "B2B") {
+                stockModel.find({ businessType: "B2B" }).exec((err, stockData) => {
+                    if (err) return res.status(400).json({ error: err.message });
+                    advertisementModel.find().exec((err, adsData) => {
+                        if (err) return res.status(400).json({ error: err.message });
+                        res.json({ ...existingUser._doc, stock: stockData, advertisements: adsData });
+                    });
+
+
+                });
+            }
+            else {
+                stockModel.find({ businessType: "B2C" }).exec((err, stockData) => {
+                    if (err) return res.status(400).json({ error: err.message });
+                    advertisementModel.find().exec((err, adsData) => {
+                        if (err) return res.status(400).json({ error: err.message });
+                        res.json({ ...existingUser._doc, stock: stockData, advertisements: adsData });
+                    });
+
+
+                });
+            }
         }
         else {
             return res.status(400).json({ msg: "Invalid OTP" });
@@ -166,12 +218,13 @@ userAuth.post("/user/otpVerification", async (req, res) => {
     }
 });
 
-// forgot password api
+// Forgot password api
 userAuth.post("/user/forgotpassword", async (req, res) => {
     try {
         const { number } = req.body;
+        console.log(number);
         const existingUser = await userModel.findOne({ number: number });
-        if (!existingUser) return res.status(400).json({ msg: "User not found" });
+        if (!existingUser) return res.status(403).json({ msg: "User not found" });
         let randomNumber = Math.floor(1000 + Math.random() * 9000);
 
         client.messages.create({
@@ -204,22 +257,45 @@ userAuth.post("/user/changePassword", async (req, res) => {
     }
 });
 
+// Get Advertisement api
+// userAuth.get("/user/getAllAds", auth, async (req, res) => {
+//     try {
+//         const existingUser = await userModel.findById(req.user);
+//         if (!existingUser) return res.status(400).json({ msg: "User not found" });
+
+//         advertisementModel.find({}).exec((err, result) => {
+//             if (err) return res.status(400).json({ error: err.message });
+//             res.json(result);
+//         });
+//     } catch (error) {
+//         res.status(500).json({ error: error.message });
+//     }
+// });
+
 
 
 //get all Enquiry api
 userAuth.get("/user/getAllEnquiry", auth, async (req, res) => {
     try {
         const existingUser = await userModel.findById(req.user).populate("enquiry");
-        if (!existingUser) return res.status(400).json({ msg: "User not found!" });
-        if (existingUser.businessType == "B2B") {
+        if (!existingUser) return res.status(403).json({ msg: "User not found!" });
+        if (existingUser.businessType === "B2B") {
             stockModel.find({ businessType: "B2B" }).exec((err, result) => {
+
                 if (err) return res.status(400).json({ error: err.message });
-                res.json({ ...existingUser._doc, stock: result });
+                advertisementModel.find().exec((err, adsData) => {
+                    if (err) return res.status(400).json({ error: err.message });
+                    res.json({ ...existingUser._doc, stock: result, advertisements: adsData });
+                })
             });
         } else {
             stockModel.find({ businessType: "B2C" }).exec((err, result) => {
                 if (err) return res.status(400).json({ error: err.message });
-                res.json({ ...existingUser._doc, stock: result });
+                advertisementModel.find().exec((err, adsData) => {
+                    if (err) return res.status(400).json({ error: err.message });
+
+                    res.json({ ...existingUser._doc, stock: result, advertisements: adsData });
+                });
             });
         }
 
@@ -237,7 +313,7 @@ userAuth.post("/user/sendEnquiry", auth, upload.single("image"), async (req, res
 
         const imagePath = req.file.path;
         const existingUser = await userModel.findById(req.user);
-        if (!existingUser) return res.status(400).json({ msg: "User not found" });
+        if (!existingUser) return res.status(403).json({ msg: "User not found" });
 
 
         cloudinary.uploader.upload(imagePath, async (error, result) => {
@@ -263,23 +339,30 @@ userAuth.post("/user/sendEnquiry", auth, upload.single("image"), async (req, res
                     if (result.businessType == "B2B") {
                         stockModel.find({ businessType: "B2B" }).exec((err, stockResult) => {
                             if (err) return res.status(400).json({ error: err.message });
-                            res.json({ ...result._doc, stock: stockResult });
-                            fs.unlink(imagePath, (err) => {
-                                if (err) {
-                                    console.log(err);
-                                }
+                            advertisementModel.find({}).exec((err, adsData) => {
+                                if (err) return res.status(400).json({ error: err.message });
+                                res.json({ ...result._doc, stock: stockResult, advertisements: adsData });
+                                fs.unlink(imagePath, (err) => {
+                                    if (err) {
+                                        console.log(err);
+                                    }
+                                })
                             })
                         });
                     }
                     else {
                         stockModel.find({ businessType: "B2C" }).exec((err, stockResult) => {
                             if (err) return res.status(400).json({ error: err.message });
-                            res.json({ ...result._doc, stock: stockResult });
-                            fs.unlink(imagePath, (err) => {
-                                if (err) {
-                                    console.log(err);
-                                }
-                            })
+                            advertisementModel.find({}).exec((err, adsData) => {
+                                if (err) return res.status(400).json({ error: err.message });
+                                res.json({ ...result._doc, stock: stockResult, advertisements: adsData });
+                                fs.unlink(imagePath, (err) => {
+                                    if (err) {
+                                        console.log(err);
+                                    }
+                                })
+
+                            });
                         });
                     }
 
@@ -301,7 +384,7 @@ userAuth.get("/user/stockList", auth, async (req, res) => {
     try {
         const location = req.query.loc;
         const existingUser = await userModel.findById(req.user);
-        if (!existingUser) return req.status(400).json({ msg: "User not found!" });
+        if (!existingUser) return req.status(403).json({ msg: "User not found!" });
         stockModel.find({ stateName: location }).exec((err, result) => {
             if (err) return res.status(400).json({ error: err.message });
             res.json(result);
@@ -316,7 +399,7 @@ userAuth.get("/user/stockList", auth, async (req, res) => {
 userAuth.get("/user/retailStockRate", auth, async (req, res) => {
     try {
         const existingUser = await userModel.findById(req.user);
-        if (!existingUser) return req.status(400).json({ msg: "User not found!" });
+        if (!existingUser) return req.status(403).json({ msg: "User not found!" });
         stockModel.find({ businessType: "B2C" }).exec((err, result) => {
             if (err) return res.status(400).json({ error: err.message });
             res.json(result);
@@ -333,7 +416,7 @@ userAuth.post("/user/sendOrder", auth, async (req, res) => {
         const { date, time, fullName, number, state, netPrice, orderQuantity, orderAmount, stockId } = req.body;
 
         const existingUser = await userModel.findById(req.user);
-        if (!existingUser) return res.status(400).json({ msg: "User not found!" });
+        if (!existingUser) return res.status(403).json({ msg: "User not found!" });
         const orderList = await orderModel.find();
         const totalOrders = orderList.length;
 
@@ -375,7 +458,7 @@ userAuth.get("/user/getAllOrders", auth, async (req, res) => {
         let newOrder = [];
         let oldOrder = [];
         const existingUser = await userModel.findById(req.user);
-        if (!existingUser) return res.status(400).json({ msg: "User not found!" });
+        if (!existingUser) return res.status(403).json({ msg: "User not found!" });
         userModel.findById(req.user).populate({
             path: "orders",
             populate: "product.stock"
@@ -443,9 +526,14 @@ userAuth.get("/user/getAllReceipts", auth, async (req, res) => {
 // Get All User Details
 userAuth.get("/user/getAllDetails", auth, async (req, res) => {
     try {
+        console.log("user id");
+        console.log(req.user);
+        const existingUser = await userModel.findById(req.user);
+        if (!existingUser) return res.status(403).json({ error: "User not found" });
         userModel.findById(req.user).exec((err, result) => {
             if (err) return res.status(400).json({ error: err.message });
-            if (result.businessType === "B2B") {
+            console.log(result);
+            if (result.businessType == "B2B") {
                 stockModel.find({ businessType: "B2B" }).exec((err, stockResult) => {
                     if (err) return res.status(400).json({ error: err.message });
                     advertisementModel.find().exec((err, adResult) => {
@@ -513,12 +601,20 @@ userAuth.post("/user/updateProfile", auth, upload.single("profilePic"), async (r
 userAuth.get("/user/getAllStocks", auth, async (req, res) => {
     try {
         const existingUser = await userModel.findById(req.user);
-        if (!existingUser) return res.status(400).json({ msg: "User not found" });
-        // if()
-        stockModel.find().exec((err, stockResult) => {
-            if (err) return res.status(400).json({ error: err.message });
-            res.json(stockResult);
-        });
+        if (!existingUser) return res.status(403).json({ msg: "User not found" });
+        if (existingUser.businessType === "B2B") {
+
+            stockModel.find({ businessType: "B2B" }).exec((err, stockResult) => {
+                if (err) return res.status(400).json({ error: err.message });
+                res.json(stockResult);
+            });
+        }
+        else {
+            stockModel.find({ businessType: "B2C" }).exec((err, stockResult) => {
+                if (err) return res.status(400).json({ error: err.message });
+                res.json(stockResult);
+            });
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
