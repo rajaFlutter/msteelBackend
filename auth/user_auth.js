@@ -13,6 +13,7 @@ const enquiryModel = require("../model/enquiry_model");
 const fs = require("fs");
 const stockModel = require("../model/stock_model");
 const advertisementModel = require("../model/advertisement_model");
+const notificationModel = require("../model/notification_model");
 
 // Twilio credentials
 var accountSid = process.env.ACCOUNTSID;
@@ -72,6 +73,13 @@ userAuth.post("/user/signup", async (req, res) => {
         const token = jwt.sign({ id: user._id }, jwtKey);
 
         await stockModel.find()
+
+        let noti = new notificationModel({
+            userData: user._id,
+            msg: `${fullName} have created new account`
+        });
+
+        await noti.save();
 
         res.json({ ...user._doc, token: token });
 
@@ -332,6 +340,13 @@ userAuth.post("/user/sendEnquiry", auth, upload.single("image"), async (req, res
 
             enquiry = await enquiry.save();
 
+            let noti = new notificationModel({
+                userData: existingUser._id,
+                msg: `${existingUser._id} have send an Enquiry`
+            });
+
+            await noti.save();
+
             userModel.findByIdAndUpdate(req.user, { $push: { enquiry: enquiry._id } }, { new: true }, (err, result) => {
                 if (err) return res.status.json({ msg: err.message });
                 userModel.findById(req.user).populate("enquiry").exec((err, result) => {
@@ -435,6 +450,13 @@ userAuth.post("/user/sendOrder", auth, async (req, res) => {
         });
 
         order = await order.save();
+
+        let noti = new notificationModel({
+            userData: existingUser._id,
+            msg: `${existingUser._id} have sent an order`
+        });
+
+        await noti.save();
 
         adminModel.findOneAndUpdate({}, { $push: { orders: order._id } }, { new: true }, (err, result) => {
             if (err) return res.status(400).json({ error: err.message });
@@ -618,7 +640,49 @@ userAuth.get("/user/getAllStocks", auth, async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
-})
+});
+
+// Subscribe user api
+userAuth.get("/user/subscribe", auth, async (req, res) => {
+    try {
+        const existingUser = await userModel.findById(req.user);
+        if (!existingUser) return res.status(403).json({ msg: "User not found" });
+
+        let noti = new notificationModel({
+            userData: existingUser._id,
+            msg: `${existingUser._id} took the subscription plan`
+        });
+
+        await noti.save();
+
+        userModel.findByIdAndUpdate(req.user, { $set: { subscribed: true } }, { new: true }, (err, userData) => {
+            if (err) return res.status(400).json({ error: err.message });
+            stockModel.find({}).exec((err, stockData) => {
+                if (err) return res.status(400).json({ error: err.message });
+                advertisementModel.find({}).exec((err, adsData) => {
+                    if (err) return res.status(400).json({ error: err.message });
+                    res.json({ ...userData._doc, stock: stockData, advertisements: adsData });
+                })
+            })
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// State-Stock Map api
+userAuth.get("/user/stateStockMap", auth, async (req, res) => {
+    try {
+        const existingUser = await userModel.findById(req.user);
+        if (!existingUser) return res.status(403).json({ msg: "User not found" });
+        stockModel.distinct("stateName", (err, stateNames) => {
+            if (err) return res.status(400).json({ error: err.message });
+            res.json(stateNames);
+        });
+    } catch (error) {
+
+    }
+});
 
 
 

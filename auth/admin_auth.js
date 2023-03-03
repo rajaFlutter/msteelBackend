@@ -19,6 +19,7 @@ const fs = require("fs");
 const cron = require("node-cron");
 const advertisementModel = require("../model/advertisement_model");
 const { restart } = require("nodemon");
+const notificationModel = require("../model/notification_model");
 
 
 
@@ -233,6 +234,24 @@ adminAuth.get("/admin/dashboardUserData/:adminId", async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// get Single enquiry api
+adminAuth.get("/admin/getSingleEnquiry/:enquiryId/:adminId", async (req, res) => {
+    try {
+        const enquiryId = req.params.enquiryId;
+        const adminId = req.params.adminId;
+
+        const existingUser = await adminModel.findById(adminId);
+        if (!existingUser) return res.status(403).json({ msg: "User not found" });
+
+        enquiryModel.findById(enquiryId).exec((err, result) => {
+            if (err) return res.status(400).json({ error: err.message });
+            res.json(result);
+        })
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+})
 
 // send back enquiry api
 adminAuth.post("/admin/sendEnquiry/:adminId/:id", upload.single("enquiryImage"), async (req, res) => {
@@ -842,7 +861,6 @@ adminAuth.post("/admin/editPayment/:paymentId/:adminId", async (req, res) => {
             const totalUserAmount = Number(userData.balanceAmount) - Number(currentLeftAmount);
 
             await userModel.findOneAndUpdate({ fullName: fullName, number: number }, { $push: { bills: billData._id }, $set: { balanceAmount: totalUserAmount } });
-            // await userModel.findOneAndUpdate({ fullName: fullName, number: number }, { $push: { bills: billData._id }, $set: { balanceAmount: totalUserAmount } });
 
             await orderModel.findByIdAndUpdate(orderData._id, { $set: { status: "completed" } });
 
@@ -1116,5 +1134,22 @@ adminAuth.post("/admin/editProfile/:adminId", upload.single("profilePic"), async
         res.status(500).json({ error: error.message });
     }
 });
+
+// get all notifications
+adminAuth.get("/admin/notifications/:adminId", async (req, res) => {
+
+    try {
+        const adminId = req.params.adminId;
+        const existingUser = await adminModel.findById(adminId);
+        if (!existingUser) return res.status(400).json({ msg: "User not found" });
+
+        notificationModel.find({}).populate("userData").exec((err, result) => {
+            if (err) return res.status(400).json({ error: err.message });
+            res.json(result);
+        })
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+})
 
 module.exports = adminAuth;
