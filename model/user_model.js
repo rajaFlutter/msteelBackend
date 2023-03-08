@@ -16,6 +16,10 @@ let userSchema = mongoose.Schema({
         type: schemaType.String,
         required: true,
     },
+    emailVerified: {
+        type: schemaType.Boolean,
+        default: false,
+    },
     email: {
         type: schemaType.String,
         required: true,

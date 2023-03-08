@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
 const userModel = require("../model/user_model");
 const { jwtKey, adminKey } = require("../constData");
 const auth = require("../middleware/token_auth");
@@ -44,18 +45,32 @@ cloudinary.config({
 
 const userAuth = express.Router();
 
+// User email Verify api
+userAuth.get("/user/emailVerify/:userId", async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const existingUser = await userModel.findById(userId);
+        if (!existingUser) return res.status(403).json({ msg: "User not found" });
+        userModel.findByIdAndUpdate(userId, { $set: { emailVerified: true } }, { new: true }, (err, result) => {
+            if (err) return res.status(400).json({ error: err.message });
+            res.send("<h1>Email Verified</h1>");
+        })
+    } catch (error) {
+        res.status(500).send("<h1>Email not Verified. Try again!</h1>");
+    }
+})
+
 
 // signup api
 userAuth.post("/user/signup", async (req, res) => {
     try {
         const { fullName, number, email, password, zipCode, city, state, businessType } = req.body;
         const existingUserEmail = await userModel.findOne({ email: email });
-        if (existingUserEmail) return res.status(400).json({ msg: "User with same email already exist!" });
+        if (existingUserEmail) return res.status(403).json({ msg: "User with same email already exist!" });
         const existingUserNumber = await userModel.findOne({ number: number });
-        if (existingUserNumber) return res.status(400).json({ msg: "User with same number already exist!" });
+        if (existingUserNumber) return res.status(403).json({ msg: "User with same number already exist!" });
         const hashedPassword = await bcryptjs.hash(password, 8);
         let randomNumber = Math.floor(1000 + Math.random() * 9000);
-
 
         let user = new userModel({
             fullName: fullName.trim(),
@@ -70,6 +85,7 @@ userAuth.post("/user/signup", async (req, res) => {
         });
 
         user = await user.save();
+        const link = `https://msteel-backend.onrender.com/user/emailVerify/${user._id}`
         const token = jwt.sign({ id: user._id }, jwtKey);
 
         await stockModel.find()
@@ -82,6 +98,40 @@ userAuth.post("/user/signup", async (req, res) => {
         await noti.save();
 
         res.json({ ...user._doc, token: token });
+
+
+        const transporter = nodemailer.createTransport({
+            service: "gmail",
+            port: 587,
+            auth: {
+                user: 'beverycoool@gmail.com',
+                pass: "ntds kidk kqth uffs",
+            },
+        });
+
+        var mailOptions = {
+            from: "beverycoool@gmail.com",
+            to: email,
+            subject: "Welcome to MSteel",
+            text: `You have successfully created account in MSteel.\n Please click on this link to verify account: ${link}`
+        };
+
+        transporter.sendMail(mailOptions, async (err, info) => {
+            if (err) {
+                console.log(err);
+                console.log("error");
+                return res.status(403).json({ msg: err.message });
+            }
+            else {
+                console.log(`email send: ${info.response}`);
+                // res.json({ msg: 'Email Sent!' });
+
+            }
+        })
+
+
+
+
 
         // otp sending 
         // client.messages.create({
@@ -325,6 +375,8 @@ userAuth.post("/user/sendEnquiry", auth, upload.single("image"), async (req, res
         const { enquiryMsg, enquiryDate } = req.body;
 
         const imagePath = req.file.path;
+        console.log("image path");
+        console.log(imagePath);
         const existingUser = await userModel.findById(req.user);
         if (!existingUser) return res.status(403).json({ msg: "User not found" });
 
