@@ -118,7 +118,7 @@ userAuth.post("/user/signup", async (req, res) => {
             if (err) {
                 console.log(err);
                 console.log("error");
-                return res.status(403).json({ msg: err.message });
+                // return res.status(403).json({ msg: err.message });
             }
             else {
                 console.log(`email send: ${info.response}`);
@@ -161,7 +161,7 @@ userAuth.post("/user/resendOTP", async (req, res) => {
         // client.messages.create({
         //     body: `Your OTP is ${randomNumber}`,
         //     messagingServiceSid: serviceSid,
-        //     to: "+919024350276"
+        //     to: number
         // }).then(message => {
         //     console.log(message.sid);
         //     console.log(message);
@@ -219,17 +219,16 @@ userAuth.post("/user/loginWithOtp", async (req, res) => {
         let randomNumber = Math.floor(1000 + Math.random() * 9000);
         await userModel.findByIdAndUpdate(existingUser._id, { $set: { otp: 0000 } });
 
-
-
-
         res.json({ ...existingUser._doc });
 
         // client.messages.create({
         //     body: `Your OTP is ${randomNumber}`,
         //     messagingServiceSid: serviceSid,
+        //     // from: twilioNumber,
         //     to: number
         // }).then(message => {
         //     console.log(message.sid);
+        //     console.log(message);
 
         // }).done();
     } catch (error) {
@@ -298,9 +297,7 @@ userAuth.post("/user/forgotpassword", async (req, res) => {
         //     to: number
         // }).then(message => {
         //     console.log(message.sid);
-        //     // userModel.findByIdAndUpdate(existingUser._id, { $set: { otp: randomNumber } }, { new: true }, (err, result) => {
-        //     //     res.json({ ...result._doc });
-        //     // })
+
         // }).done();
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -619,6 +616,7 @@ userAuth.get("/user/getAllDetails", auth, async (req, res) => {
                     if (err) return res.status(400).json({ error: err.message });
                     advertisementModel.find().exec((err, adResult) => {
                         if (err) return res.status(400).json({ error: err.message });
+                        console.log(stockResult);
                         res.json({ ...result._doc, stock: stockResult, advertisements: adResult });
 
                     });

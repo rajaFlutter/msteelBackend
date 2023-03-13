@@ -1150,6 +1150,23 @@ adminAuth.get("/admin/notifications/:adminId", async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
-})
+});
+
+// get list of Stocks in a State
+adminAuth.get("/admin/stateList/:stateName/:adminId", async (req, res) => {
+    try {
+        const adminId = req.params.adminId;
+        const stateName = req.params.stateName;
+        const existingUser = await adminModel.findById(adminId);
+        if (!existingUser) return res.status(403).json({ msg: "User not found" });
+
+        stockModel.distinct("stockName", { "stateName": stateName }, (err, stockNames) => {
+            if (err) return res.status(400).json({ error: err.message });
+            res.json(stockNames);
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 module.exports = adminAuth;
