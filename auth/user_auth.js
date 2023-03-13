@@ -64,19 +64,17 @@ userAuth.get("/user/emailVerify/:userId", async (req, res) => {
 // signup api
 userAuth.post("/user/signup", async (req, res) => {
     try {
-        const { fullName, number, email, password, zipCode, city, state, businessType } = req.body;
+        const { fullName, number, email, zipCode, city, state, businessType } = req.body;
         const existingUserEmail = await userModel.findOne({ email: email });
         if (existingUserEmail) return res.status(403).json({ msg: "User with same email already exist!" });
         const existingUserNumber = await userModel.findOne({ number: number });
         if (existingUserNumber) return res.status(403).json({ msg: "User with same number already exist!" });
-        const hashedPassword = await bcryptjs.hash(password, 8);
         let randomNumber = Math.floor(1000 + Math.random() * 9000);
 
         let user = new userModel({
             fullName: fullName.trim(),
             number: number.trim(),
             email: email.trim(),
-            password: hashedPassword,
             zipCode: zipCode.trim(),
             city: city.trim(),
             otp: 0000,
@@ -173,43 +171,43 @@ userAuth.post("/user/resendOTP", async (req, res) => {
     }
 });
 
-// login api
-userAuth.post("/user/login", async (req, res) => {
-    try {
-        const { number, password } = req.body;
-        const existingUser = await userModel.findOne({ number: number });
-        if (!existingUser) return res.status(403).json({ msg: "User not found!" });
-        const isMatch = await bcryptjs.compare(password, existingUser.password);
-        if (!isMatch) return res.status(400).json({ msg: "Incorrect Password" });
+// // login api
+// userAuth.post("/user/login", async (req, res) => {
+//     try {
+//         const { number } = req.body;
+//         const existingUser = await userModel.findOne({ number: number });
+//         if (!existingUser) return res.status(403).json({ msg: "User not found!" });
+//         // const isMatch = await bcryptjs.compare(password, existingUser.password);
+//         // if (!isMatch) return res.status(400).json({ msg: "Incorrect Password" });
 
-        const token = jwt.sign({ id: existingUser._id }, jwtKey);
-        if (existingUser.businessType == "B2B") {
-            stockModel.find({ businessType: "B2B" }).exec((err, stockData) => {
-                if (err) return res.status(400).json({ error: err.message });
-                advertisementModel.find().exec((err, adResult) => {
-                    if (err) return res.status(400).json({ error: err.message });
-                    res.json({ ...existingUser._doc, token: token, stock: stockData, advertisements: adResult });
+//         const token = jwt.sign({ id: existingUser._id }, jwtKey);
+//         if (existingUser.businessType == "B2B") {
+//             stockModel.find({ businessType: "B2B" }).exec((err, stockData) => {
+//                 if (err) return res.status(400).json({ error: err.message });
+//                 advertisementModel.find().exec((err, adResult) => {
+//                     if (err) return res.status(400).json({ error: err.message });
+//                     res.json({ ...existingUser._doc, token: token, stock: stockData, advertisements: adResult });
 
-                });
+//                 });
 
-            })
-        }
-        else {
-            stockModel.find({ businessType: "B2C" }).exec((err, stockData) => {
-                if (err) return res.status(400).json({ error: err.message });
-                advertisementModel.find().exec((err, adResult) => {
-                    if (err) return res.status(400).json({ error: err.message });
-                    res.json({ ...existingUser._doc, token: token, stock: stockData, advertisements: adResult });
+//             })
+//         }
+//         else {
+//             stockModel.find({ businessType: "B2C" }).exec((err, stockData) => {
+//                 if (err) return res.status(400).json({ error: err.message });
+//                 advertisementModel.find().exec((err, adResult) => {
+//                     if (err) return res.status(400).json({ error: err.message });
+//                     res.json({ ...existingUser._doc, token: token, stock: stockData, advertisements: adResult });
 
-                });
+//                 });
 
-            })
-        }
+//             })
+//         }
 
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+//     } catch (error) {
+//         res.status(500).json({ error: error.message });
+//     }
+// });
 
 // Login with OTP api
 userAuth.post("/user/loginWithOtp", async (req, res) => {
@@ -221,7 +219,10 @@ userAuth.post("/user/loginWithOtp", async (req, res) => {
         let randomNumber = Math.floor(1000 + Math.random() * 9000);
         await userModel.findByIdAndUpdate(existingUser._id, { $set: { otp: 0000 } });
 
-        res.json({ msg: "OTP send" });
+
+
+
+        res.json({ ...existingUser._doc });
 
         // client.messages.create({
         //     body: `Your OTP is ${randomNumber}`,
@@ -242,6 +243,7 @@ userAuth.post("/user/otpVerification", async (req, res) => {
         const { otp, number } = req.body;
         const existingUser = await userModel.findOne({ number: number });
         if (!existingUser) return res.status(403).json({ msg: "User not found" });
+        const token = jwt.sign({ id: existingUser._id }, jwtKey);
 
 
         if (parseInt(otp) === existingUser.otp) {
@@ -250,7 +252,7 @@ userAuth.post("/user/otpVerification", async (req, res) => {
                     if (err) return res.status(400).json({ error: err.message });
                     advertisementModel.find().exec((err, adsData) => {
                         if (err) return res.status(400).json({ error: err.message });
-                        res.json({ ...existingUser._doc, stock: stockData, advertisements: adsData });
+                        res.json({ ...existingUser._doc, token: token, stock: stockData, advertisements: adsData });
                     });
 
 
@@ -261,7 +263,7 @@ userAuth.post("/user/otpVerification", async (req, res) => {
                     if (err) return res.status(400).json({ error: err.message });
                     advertisementModel.find().exec((err, adsData) => {
                         if (err) return res.status(400).json({ error: err.message });
-                        res.json({ ...existingUser._doc, stock: stockData, advertisements: adsData });
+                        res.json({ ...existingUser._doc, token: token, stock: stockData, advertisements: adsData });
                     });
 
 
@@ -306,19 +308,19 @@ userAuth.post("/user/forgotpassword", async (req, res) => {
 });
 
 
-// change password
-userAuth.post("/user/changePassword", async (req, res) => {
-    try {
-        const { password, userId } = req.body;
-        const hashedPassword = await bcryptjs.hash(password, 8);
-        userModel.findByIdAndUpdate(userId, { $set: { password: hashedPassword } }, { new: true }, (err, result) => {
-            if (err) return res.status(400).json({ msg: err.message });
-            res.json({ ...result._doc });
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// // change password
+// userAuth.post("/user/changePassword", async (req, res) => {
+//     try {
+//         const { password, userId } = req.body;
+//         const hashedPassword = await bcryptjs.hash(password, 8);
+//         userModel.findByIdAndUpdate(userId, { $set: { password: hashedPassword } }, { new: true }, (err, result) => {
+//             if (err) return res.status(400).json({ msg: err.message });
+//             res.json({ ...result._doc });
+//         });
+//     } catch (error) {
+//         res.status(500).json({ error: error.message });
+//     }
+// });
 
 // Get Advertisement api
 // userAuth.get("/user/getAllAds", auth, async (req, res) => {

@@ -32,10 +32,7 @@ let userSchema = mongoose.Schema({
             message: "Please enter a valid email!"
         },
     },
-    password: {
-        type: schemaType.String,
-        required: true,
-    },
+
     address: {
         type: schemaType.String,
         default: ""

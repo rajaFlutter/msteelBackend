@@ -384,13 +384,13 @@ adminAuth.get("/admin/getSingleUser/:userId/:adminId", async (req, res) => {
 adminAuth.post("/admin/editUser/:adminId", async (req, res) => {
     try {
         const adminId = req.params.adminId;
-        const { fullName, number, email, password, zipCode, city, state, businessType, userId } = req.body;
+        const { fullName, number, email, zipCode, city, state, businessType, userId } = req.body;
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status.json({ msg: "User not found!" });
 
-        const hashedPassword = await bcryptjs.hash(password, 8);
+        // const hashedPassword = await bcryptjs.hash(password, 8);
 
-        userModel.findByIdAndUpdate(userId, { $set: { fullName, number, email, password: hashedPassword, zipCode, city, state, businessType } }, { new: true }, (err, result) => {
+        userModel.findByIdAndUpdate(userId, { $set: { fullName, number, email, zipCode, city, state, businessType } }, { new: true }, (err, result) => {
             if (err) return res.status(400).json({ msg: err.message });
             userModel.find().exec((err, result) => {
                 if (err) return res.status(400).json({ msg: err.message });
@@ -425,17 +425,17 @@ adminAuth.post("/admin/delete/user/:adminId", async (req, res) => {
 adminAuth.post("/admin/addUser/:adminId", async (req, res) => {
     try {
         const adminId = req.params.adminId;
-        const { fullName, number, email, password, zipCode, city, state, businessType } = req.body;
+        const { fullName, number, email, zipCode, city, state, businessType } = req.body;
         const existingUser = await adminModel.findById(adminId);
         if (!existingUser) return res.status.json({ msg: "User not found!" });
 
-        const hashedPassword = await bcryptjs.hash(password, 8);
+        // const hashedPassword = await bcryptjs.hash(password, 8);
 
         let user = new userModel({
             fullName: fullName,
             number: number,
             email: email,
-            password: hashedPassword,
+            // password: hashedPassword,
             zipCode: zipCode,
             city: city,
             state: state,
