@@ -559,7 +559,7 @@ adminAuth.post("/admin/uploadStock/:adminId", async (req, res) => {
             stateName: state,
             stockDate: stockDate,
             businessType: businessType,
-            stockPrice: parseInt(ss.basic) + parseInt(ss.loading) + parseInt(ss.insurance) + parseInt(ss.gst) + parseInt(ss.tcs),
+            stockPrice: parseInt(ss.basic) + parseInt(ss.loading) + parseInt(ss.insurance) + ((parseInt(ss.basic) * parseInt(ss.gst)) / 100) + parseInt(ss.tcs),
             stockData: stockData
 
 
